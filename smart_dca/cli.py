@@ -164,6 +164,23 @@ def cmd_backtest(args: argparse.Namespace, config: AppConfig, client: ScalableCl
     return 0
 
 
+def cmd_dashboard(args: argparse.Namespace, config: AppConfig, client: ScalableClient) -> int:
+    """Open or serve the interactive Strategy Studio & Backtest Dashboard."""
+    import os
+    import webbrowser
+    from pathlib import Path
+
+    dashboard_file = Path(__file__).resolve().parent.parent / "dashboard" / "index.html"
+    if not dashboard_file.exists():
+        print(f"\033[91m[ERROR]\033[0m Dashboard file not found at {dashboard_file}")
+        return 1
+
+    file_url = f"file://{dashboard_file}"
+    print(f"\nOpening Interactive Dashboard in browser: {file_url}")
+    webbrowser.open(file_url)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Scalable Capital Smart / Value-Averaging DCA",
@@ -191,6 +208,9 @@ def main() -> int:
     backtest_parser = subparsers.add_parser("backtest", help="Simulate historical performance vs standard DCA")
     backtest_parser.add_argument("--isin", help="Specific ISIN to backtest")
 
+    # dashboard
+    dashboard_parser = subparsers.add_parser("dashboard", help="Open interactive strategy studio & backtest dashboard")
+
     args = parser.parse_args()
 
     # Logging setup
@@ -212,6 +232,8 @@ def main() -> int:
         return cmd_plans(args, config, client)
     elif args.command == "backtest":
         return cmd_backtest(args, config, client)
+    elif args.command == "dashboard":
+        return cmd_dashboard(args, config, client)
     else:
         parser.print_help()
         return 0
