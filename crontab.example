@@ -1,0 +1,14 @@
+# ==============================================================================
+# Local Cron Configuration Example for Smart DCA
+# ==============================================================================
+# Edit your crontab using: crontab -e
+# Ensure absolute paths and homebrew PATH are configured.
+
+SHELL=/bin/bash
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+
+# 示例 1：每周一至周五 08:30 欧洲盘前运行一次状态巡检 (输出到 logs/cron.log)
+30 8 * * 1-5 cd /Users/chair_kao/Antigravity/scalable-capital-smart-dca && ./run_smart_dca.sh run --dry-run >> logs/cron.log 2>&1
+
+# 示例 2：每周日晚上 20:00 执行一次正式定投额度调整 (Live 模式)
+0 20 * * 0 cd /Users/chair_kao/Antigravity/scalable-capital-smart-dca && ./run_smart_dca.sh run --live >> logs/cron_live.log 2>&1

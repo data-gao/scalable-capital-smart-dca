@@ -1,0 +1,16 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# State & Logs
+.smart_dca_state.json
+logs/
+*.log
+
+# Scalable session tokens (never commit credentials)
+session.json
+*.lock
+
+# OS files
+.DS_Store

@@ -1,0 +1,51 @@
+name: Smart DCA Scheduled Runner
+
+on:
+  schedule:
+    # Runs at 08:30 UTC every Monday to Friday (trading days before European market opens)
+    - cron: '30 8 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      execution_mode:
+        description: 'Execution Mode'
+        required: true
+        default: 'dry-run'
+        type: choice
+        options:
+          - dry-run
+          - preview
+          - live
+
+jobs:
+  run-smart-dca:
+    runs-on: macos-latest  # Recommended if using macOS Keychain or self-hosted runner
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Scalable CLI
+        run: |
+          brew tap ScalableCapital/tap
+          brew trust --formula ScalableCapital/tap/scalable-cli || true
+          brew install scalable-cli
+
+      - name: Restore Session / Configure Credentials
+        env:
+          SC_SESSION_CONFIG: ${{ secrets.SC_SESSION_CONFIG }}
+        run: |
+          if [ -n "$SC_SESSION_CONFIG" ]; then
+            mkdir -p ~/.config/scalable-cli
+            echo "$SC_SESSION_CONFIG" > ~/.config/scalable-cli/session.json
+          fi
+
+      - name: Execute Smart DCA
+        env:
+          EXECUTION_MODE: ${{ inputs.execution_mode || 'dry-run' }}
+        run: |
+          ./run_smart_dca.sh run --"$EXECUTION_MODE"
