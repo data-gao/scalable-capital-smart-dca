@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart / Value-Averaging DCA Strategy Studio</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --purple: #a855f7;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+    input[type=range] {
+      accent-color: #38bdf8;
+    }
+  </style>
+</head>
+<body class="p-3 md:p-6 custom-scrollbar">
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-700">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⚡</span>
+          <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+            Smart DCA & Value-Averaging Backtest Studio
+          </h1>
+          <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-sky-950 text-sky-400 border border-sky-800">
+            Interactive
+          </span>
+        </div>
+        <p class="text-xs md:text-sm text-slate-400 mt-1">
+          Simulate adaptive DCA strategies: Trim on 200-SMA overvaluation, buy deep dips on Bollinger Breakdown & RSI oversold.
+        </p>
+      </div>
+
+      <!-- Asset Pills -->
+      <div class="flex flex-wrap gap-2" id="asset-pills">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <!-- Parameter Config & Real-time KPIs -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Strategy Controls Panel -->
+      <div class="lg:col-span-4 bg-slate-800/90 rounded-xl p-5 border border-slate-700 space-y-5 shadow-lg">
+        <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <span>⚙️</span> Strategy Parameters
+          </h2>
+          <button id="reset-btn" class="text-xs text-sky-400 hover:text-sky-300 transition underline">Reset Defaults</button>
+        </div>
+
+        <!-- Sliders -->
+        <div class="space-y-4 text-xs">
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Base Period Investment</span>
+              <span id="base-amt-val" class="font-mono text-sky-400 font-bold">€400</span>
+            </div>
+            <input type="range" id="base-amt" min="50" max="2000" step="50" value="400" class="w-full">
+            <span class="text-[10px] text-slate-500">Standard DCA baseline amount invested every period.</span>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Overvalued Trim Multiplier (Price > SMA)</span>
+              <span id="trim-mult-val" class="font-mono text-amber-400 font-bold">70% (0.70x)</span>
+            </div>
+            <input type="range" id="trim-mult" min="40" max="95" step="5" value="70" class="w-full">
+            <span class="text-[10px] text-slate-500">When above 200-SMA, reduce DCA to preserve cash reserve.</span>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>SMA Trend Period</span>
+              <span id="sma-period-val" class="font-mono text-indigo-400 font-bold">40 Weeks (~200 Days)</span>
+            </div>
+            <input type="range" id="sma-period" min="10" max="45" step="1" value="40" class="w-full">
+            <span class="text-[10px] text-slate-500">Industry standard 40-week moving average for major trendline.</span>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Oversold Scale Multiplier</span>
+              <span id="scale-mult-val" class="font-mono text-green-400 font-bold">140% (1.40x)</span>
+            </div>
+            <input type="range" id="scale-mult" min="110" max="250" step="10" value="140" class="w-full">
+            <span class="text-[10px] text-slate-500">Scale up upcoming DCA during dips to lower average cost.</span>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>RSI-14 Oversold Threshold</span>
+              <span id="rsi-val" class="font-mono text-green-400 font-bold">&lt; 35</span>
+            </div>
+            <input type="range" id="rsi-thresh" min="20" max="45" step="1" value="35" class="w-full">
+            <span class="text-[10px] text-slate-500">RSI oversold trigger level (indexes rarely dip below 30).</span>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Bollinger Band Deviation</span>
+              <span id="bb-std-val" class="font-mono text-sky-400 font-bold">2.0 σ</span>
+            </div>
+            <input type="range" id="bb-std" min="1.5" max="2.5" step="0.1" value="2.0" class="w-full">
+            <span class="text-[10px] text-slate-500">Triggers dip-buy signal when price breaks lower band.</span>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Lump-Sum Dip Buy Amount</span>
+              <span id="dip-buy-val" class="font-mono text-emerald-400 font-bold">€150</span>
+            </div>
+            <input type="range" id="dip-buy-amt" min="0" max="500" step="25" value="150" class="w-full">
+            <span class="text-[10px] text-slate-500">Immediate one-off buy trade triggered upon dip detection.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards & Highlights -->
+      <div class="lg:col-span-8 flex flex-col justify-between space-y-4">
+        <!-- Top KPI Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
+            <span class="text-xs text-slate-400 font-medium">Smart DCA Value</span>
+            <div id="kpi-smart-val" class="text-lg md:text-xl font-bold font-mono text-white mt-1">€0.00</div>
+            <span id="kpi-smart-ret" class="text-xs font-semibold text-green-400 font-mono">+0.00%</span>
+          </div>
+
+          <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
+            <span class="text-xs text-slate-400 font-medium">Standard DCA Value</span>
+            <div id="kpi-std-val" class="text-lg md:text-xl font-bold font-mono text-slate-300 mt-1">€0.00</div>
+            <span id="kpi-std-ret" class="text-xs font-semibold text-slate-400 font-mono">+0.00%</span>
+          </div>
+
+          <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
+            <span class="text-xs text-slate-400 font-medium">Max Drawdown (MDD)</span>
+            <div id="kpi-mdd-smart" class="text-lg md:text-xl font-bold font-mono text-amber-400 mt-1">-0.00%</div>
+            <span id="kpi-mdd-std" class="text-xs text-slate-400 font-mono">Std: -0.00%</span>
+          </div>
+
+          <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
+            <span class="text-xs text-slate-400 font-medium">Alpha (Outperformance)</span>
+            <div id="kpi-alpha" class="text-lg md:text-xl font-bold font-mono text-sky-400 mt-1">+0.00%</div>
+            <span id="kpi-cash-saved" class="text-xs text-emerald-400 font-mono">Cash saved: €0</span>
+          </div>
+        </div>
+
+        <!-- Secondary Stats Strip -->
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+          <div>
+            <span class="text-slate-400">Total Invested:</span>
+            <div id="kpi-invested-comp" class="text-slate-200 font-bold mt-0.5">€0 vs €0</div>
+          </div>
+          <div>
+            <span class="text-slate-400">Avg Cost per Share:</span>
+            <div id="kpi-avg-cost" class="text-sky-300 font-bold mt-0.5">€0 vs €0</div>
+          </div>
+          <div>
+            <span class="text-slate-400">Total Shares Owned:</span>
+            <div id="kpi-shares" class="text-slate-200 font-bold mt-0.5">0 vs 0</div>
+          </div>
+          <div>
+            <span class="text-slate-400">Signals Triggered:</span>
+            <div id="kpi-signals-count" class="text-slate-300 font-bold mt-0.5">🟢 0 Dip | 🟡 0 Trim</div>
+          </div>
+        </div>
+
+        <!-- Strategy Insight Callout -->
+        <div id="strategy-callout" class="bg-gradient-to-r from-sky-950/40 to-slate-900/60 border-l-4 border-sky-400 p-3.5 rounded-r-xl text-xs text-slate-300 space-y-1">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart Tabs -->
+    <div class="bg-slate-800/90 rounded-xl p-5 border border-slate-700 shadow-xl space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700 pb-3">
+        <div class="flex gap-2 text-xs font-semibold">
+          <button id="tab-price" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white transition">Price & Technical Indicators</button>
+          <button id="tab-equity" class="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:text-white transition">Portfolio Equity Curve</button>
+          <button id="tab-drawdown" class="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:text-white transition">Drawdown (回撤深度对比)</button>
+        </div>
+        <div class="text-[11px] text-slate-400 flex items-center gap-3">
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span> 🟢 Dip Buy</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> 🟡 Trim 70%</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span> 🔵 Neutral</span>
+        </div>
+      </div>
+
+      <!-- Canvas Area -->
+      <div class="relative w-full h-[360px] md:h-[420px]">
+        <canvas id="chart-canvas" class="w-full h-full cursor-crosshair"></canvas>
+        <div id="tooltip" class="absolute hidden pointer-events-none bg-slate-900/95 border border-slate-700 p-2.5 rounded-lg text-xs font-mono shadow-2xl z-20 space-y-1"></div>
+      </div>
+    </div>
+
+    <!-- Execution Ledger Table -->
+    <div class="bg-slate-800/90 rounded-xl p-5 border border-slate-700 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+          <span>📋</span> Historical Execution Ledger & Strategy Decisions
+        </h3>
+        <span class="text-xs text-slate-400" id="ledger-count">52 Weekly Periods</span>
+      </div>
+
+      <div class="overflow-x-auto max-h-[300px] custom-scrollbar border border-slate-700 rounded-lg">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-900/90 text-slate-400 uppercase font-mono text-[10px] sticky top-0 border-b border-slate-700">
+            <tr>
+              <th class="p-2.5">Date</th>
+              <th class="p-2.5">Price</th>
+              <th class="p-2.5">200-SMA</th>
+              <th class="p-2.5">RSI-14</th>
+              <th class="p-2.5">Signal</th>
+              <th class="p-2.5">Smart Invest</th>
+              <th class="p-2.5">Std Invest</th>
+              <th class="p-2.5">Shares (Cum)</th>
+              <th class="p-2.5">Drawdown</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-body" class="divide-y divide-slate-800 font-mono text-[11px]">
+            <!-- populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const RAW_MARKET_DATA = {"LU0496786574": {"name": "Amundi Core S&P 500", "isin": "LU0496786574", "candles": [{"date": "2025-11-19", "open": 58.966, "high": 60.724, "low": 58.408, "close": 60.435}, {"date": "2025-11-26", "open": 60.532, "high": 61.099, "low": 60.287, "close": 60.748}, {"date": "2025-12-03", "open": 60.71, "high": 61.21, "low": 60.125, "close": 60.229}, {"date": "2025-12-10", "open": 60.255, "high": 60.434, "low": 58.871, "close": 59.182}, {"date": "2025-12-17", "open": 59.44, "high": 60.09, "low": 58.631, "close": 59.975}, {"date": "2025-12-24", "open": 60.247, "high": 60.277, "low": 59.964, "close": 60.146}, {"date": "2025-12-31", "open": 60.047, "high": 60.926, "low": 59.589, "close": 60.908}, {"date": "2026-01-07", "open": 60.838, "high": 61.467, "low": 60.488, "close": 61.26}, {"date": "2026-01-14", "open": 61.13, "high": 61.625, "low": 59.399, "close": 59.466}, {"date": "2026-01-21", "open": 59.643, "high": 60.708, "low": 59.233, "close": 59.442}, {"date": "2026-01-28", "open": 59.837, "high": 60.862, "low": 59.014, "close": 59.92}, {"date": "2026-02-04", "open": 60.019, "high": 60.247, "low": 58.661, "close": 59.896}, {"date": "2026-02-11", "open": 59.837, "high": 60.444, "low": 58.752, "close": 59.276}, {"date": "2026-02-18", "open": 59.405, "high": 60.18, "low": 59.343, "close": 59.979}, {"date": "2026-02-25", "open": 59.917, "high": 60.501, "low": 59.251, "close": 60.142}, {"date": "2026-03-04", "open": 59.936, "high": 60.791, "low": 58.879, "close": 60.041}, {"date": "2026-03-11", "open": 59.97, "high": 60.272, "low": 59.449, "close": 59.807}, {"date": "2026-03-18", "open": 60.102, "high": 60.217, "low": 57.345, "close": 58.369}, {"date": "2026-03-25", "open": 58.408, "high": 58.831, "low": 56.639, "close": 57.993}, {"date": "2026-04-01", "open": 58.159, "high": 58.872, "low": 57.636, "close": 58.724}, {"date": "2026-04-08", "open": 59.7, "high": 60.736, "low": 59.269, "close": 60.652}, {"date": "2026-04-15", "open": 60.713, "high": 62.434, "low": 60.661, "close": 62.133}, {"date": "2026-04-22", "open": 62.112, "high": 63.004, "low": 62.071, "close": 62.703}, {"date": "2026-04-29", "open": 62.843, "high": 63.919, "low": 62.574, "close": 63.908}, {"date": "2026-05-06", "open": 63.819, "high": 64.863, "low": 63.737, "close": 64.782}, {"date": "2026-05-13", "open": 64.984, "high": 66.204, "low": 64.782, "close": 65.168}, {"date": "2026-05-20", "open": 65.209, "high": 66.75, "low": 65.213, "close": 66.499}, {"date": "2026-05-27", "open": 66.509, "high": 67.394, "low": 66.385, "close": 67.394}, {"date": "2026-06-03", "open": 67.395, "high": 67.474, "low": 64.648, "close": 65.875}, {"date": "2026-06-10", "open": 65.603, "high": 67.264, "low": 64.663, "close": 66.657}, {"date": "2026-06-17", "open": 66.819, "high": 67.854, "low": 66.377, "close": 66.803}, {"date": "2026-06-24", "open": 66.963, "high": 67.713, "low": 65.814, "close": 67.621}, {"date": "2026-07-01", "open": 67.433, "high": 68.065, "low": 66.966, "close": 67.685}, {"date": "2026-07-08", "open": 67.651, "high": 68.406, "low": 67.043, "close": 68.097}, {"date": "2026-07-15", "open": 68.099, "high": 68.365, "low": 67.011, "close": 67.869}, {"date": "2026-07-22", "open": 67.724, "high": 67.974, "low": 66.714, "close": 67.275}, {"date": "2026-07-29", "open": 67.143, "high": 69.345, "low": 65.621, "close": 69.247}, {"date": "2026-08-05", "open": 69.368, "high": 69.575, "low": 68.863, "close": 69.017}, {"date": "2026-08-12", "open": 69.124, "high": 69.836, "low": 68.509, "close": 68.523}, {"date": "2026-08-19", "open": 68.397, "high": 68.587, "low": 67.459, "close": 67.831}, {"date": "2026-08-26", "open": 67.844, "high": 69.05, "low": 67.753, "close": 67.986}, {"date": "2026-09-02", "open": 67.983, "high": 68.885, "low": 67.845, "close": 68.108}, {"date": "2026-09-09", "open": 68.112, "high": 68.313, "low": 67.352, "close": 67.907}, {"date": "2026-09-16", "open": 67.956, "high": 70.134, "low": 67.603, "close": 69.976}, {"date": "2026-09-23", "open": 70.22, "high": 70.358, "low": 69.432, "close": 69.92}, {"date": "2026-09-30", "open": 70.064, "high": 71.914, "low": 69.659, "close": 71.793}, {"date": "2026-10-07", "open": 71.926, "high": 72.356, "low": 71.19, "close": 72.017}, {"date": "2026-10-14", "open": 72.122, "high": 72.315, "low": 70.169, "close": 71.186}, {"date": "2026-10-21", "open": 71.199, "high": 71.753, "low": 70.186, "close": 71.708}, {"date": "2026-10-28", "open": 71.743, "high": 72.025, "low": 69.351, "close": 69.974}, {"date": "2026-11-04", "open": 69.011, "high": 71.066, "low": 67.465, "close": 69.722}, {"date": "2026-11-11", "open": 70.042, "high": 71.515, "low": 68.441, "close": 69.016}]}, "IE00BK5BQT80": {"name": "Vanguard FTSE All-World (VWCE)", "isin": "IE00BK5BQT80", "candles": [{"date": "2025-11-19", "open": 140.86, "high": 144.07, "low": 139.21, "close": 143.55}, {"date": "2025-11-26", "open": 143.8, "high": 144.97, "low": 143.34, "close": 144.38}, {"date": "2025-12-03", "open": 144.33, "high": 145.59, "low": 143.43, "close": 144.64}, {"date": "2025-12-10", "open": 144.71, "high": 145.3, "low": 142.02, "close": 142.81}, {"date": "2025-12-17", "open": 143.1, "high": 144.9, "low": 141.54, "close": 144.69}, {"date": "2025-12-24", "open": 145.46, "high": 145.45, "low": 144.75, "close": 145.34}, {"date": "2025-12-31", "open": 145.48, "high": 148.23, "low": 144.86, "close": 148.15}, {"date": "2026-01-07", "open": 147.99, "high": 149.51, "low": 147.01, "close": 149.12}, {"date": "2026-01-14", "open": 149.0, "high": 150.35, "low": 145.4, "close": 145.6}, {"date": "2026-01-21", "open": 145.96, "high": 148.49, "low": 145.35, "close": 146.5}, {"date": "2026-01-28", "open": 147.57, "high": 149.39, "low": 145.34, "close": 147.64}, {"date": "2026-02-04", "open": 147.9, "high": 149.22, "low": 145.61, "close": 148.53}, {"date": "2026-02-11", "open": 148.67, "high": 150.07, "low": 146.57, "close": 147.8}, {"date": "2026-02-18", "open": 148.15, "high": 150.27, "low": 148.11, "close": 150.16}, {"date": "2026-02-25", "open": 149.95, "high": 151.42, "low": 146.48, "close": 148.29}, {"date": "2026-03-04", "open": 147.23, "high": 149.84, "low": 144.56, "close": 148.03}, {"date": "2026-03-11", "open": 147.83, "high": 148.54, "low": 146.21, "close": 147.64}, {"date": "2026-03-18", "open": 148.47, "high": 148.77, "low": 140.22, "close": 143.76}, {"date": "2026-03-25", "open": 143.86, "high": 144.95, "low": 139.88, "close": 143.63}, {"date": "2026-04-01", "open": 144.16, "high": 145.73, "low": 142.46, "close": 145.08}, {"date": "2026-04-08", "open": 147.72, "high": 150.63, "low": 147.19, "close": 150.54}, {"date": "2026-04-15", "open": 150.46, "high": 153.92, "low": 150.31, "close": 152.53}, {"date": "2026-04-22", "open": 152.86, "high": 154.19, "low": 152.07, "close": 153.26}, {"date": "2026-04-29", "open": 153.76, "high": 156.58, "low": 152.78, "close": 156.41}, {"date": "2026-05-06", "open": 156.69, "high": 158.85, "low": 156.18, "close": 158.03}, {"date": "2026-05-13", "open": 158.61, "high": 161.15, "low": 157.74, "close": 158.37}, {"date": "2026-05-20", "open": 158.39, "high": 163.02, "low": 157.92, "close": 162.7}, {"date": "2026-05-27", "open": 162.63, "high": 165.11, "low": 161.79, "close": 165.07}, {"date": "2026-06-03", "open": 165.05, "high": 165.07, "low": 157.69, "close": 160.61}, {"date": "2026-06-10", "open": 160.08, "high": 164.91, "low": 158.04, "close": 163.57}, {"date": "2026-06-17", "open": 164.12, "high": 167.07, "low": 162.86, "close": 163.87}, {"date": "2026-06-24", "open": 164.16, "high": 165.73, "low": 161.79, "close": 165.42}, {"date": "2026-07-01", "open": 164.9, "high": 166.65, "low": 163.63, "close": 165.39}, {"date": "2026-07-08", "open": 165.25, "high": 166.91, "low": 163.01, "close": 165.97}, {"date": "2026-07-15", "open": 166.0, "high": 166.39, "low": 162.51, "close": 165.33}, {"date": "2026-07-22", "open": 164.96, "high": 165.59, "low": 162.77, "close": 163.88}, {"date": "2026-07-29", "open": 163.04, "high": 168.45, "low": 160.6, "close": 168.14}, {"date": "2026-08-05", "open": 168.62, "high": 168.99, "low": 167.37, "close": 168.22}, {"date": "2026-08-12", "open": 168.38, "high": 170.14, "low": 166.85, "close": 166.99}, {"date": "2026-08-19", "open": 166.48, "high": 167.21, "low": 164.96, "close": 166.4}, {"date": "2026-08-26", "open": 166.51, "high": 168.62, "low": 165.69, "close": 166.09}, {"date": "2026-09-02", "open": 166.21, "high": 168.37, "low": 165.51, "close": 167.43}, {"date": "2026-09-09", "open": 167.35, "high": 167.35, "low": 164.83, "close": 165.45}, {"date": "2026-09-16", "open": 165.66, "high": 170.88, "low": 165.03, "close": 170.53}, {"date": "2026-09-23", "open": 170.8, "high": 170.99, "low": 168.59, "close": 169.59}, {"date": "2026-09-30", "open": 169.58, "high": 173.67, "low": 168.81, "close": 173.31}, {"date": "2026-10-07", "open": 173.2, "high": 173.97, "low": 171.1, "close": 172.92}, {"date": "2026-10-14", "open": 172.91, "high": 173.42, "low": 168.84, "close": 171.05}, {"date": "2026-10-21", "open": 170.84, "high": 171.99, "low": 168.21, "close": 171.84}, {"date": "2026-10-28", "open": 171.85, "high": 176.06, "low": 166.92, "close": 168.18}, {"date": "2026-11-04", "open": 166.03, "high": 170.77, "low": 162.93, "close": 168.17}, {"date": "2026-11-11", "open": 169.26, "high": 171.77, "low": 164.78, "close": 166.19}]}, "LU2903252349": {"name": "Scalable MSCI AC World", "isin": "LU2903252349", "candles": [{"date": "2025-11-19", "open": 10.054, "high": 10.301, "low": 9.947, "close": 10.251}, {"date": "2025-11-26", "open": 10.276, "high": 10.362, "low": 10.248, "close": 10.324}, {"date": "2025-12-03", "open": 10.316, "high": 10.413, "low": 10.262, "close": 10.353}, {"date": "2025-12-10", "open": 10.352, "high": 10.385, "low": 10.164, "close": 10.211}, {"date": "2025-12-17", "open": 10.25, "high": 10.368, "low": 10.126, "close": 10.358}, {"date": "2025-12-24", "open": 10.418, "high": 10.428, "low": 10.366, "close": 10.417}, {"date": "2025-12-31", "open": 10.4, "high": 10.605, "low": 10.364, "close": 10.6}, {"date": "2026-01-07", "open": 10.587, "high": 10.706, "low": 10.536, "close": 10.675}, {"date": "2026-01-14", "open": 10.669, "high": 10.762, "low": 10.422, "close": 10.424}, {"date": "2026-01-21", "open": 10.442, "high": 10.643, "low": 10.401, "close": 10.476}, {"date": "2026-01-28", "open": 10.547, "high": 10.691, "low": 10.376, "close": 10.554}, {"date": "2026-02-04", "open": 10.57, "high": 10.667, "low": 10.406, "close": 10.632}, {"date": "2026-02-11", "open": 10.641, "high": 10.719, "low": 10.463, "close": 10.565}, {"date": "2026-02-18", "open": 10.585, "high": 10.745, "low": 10.572, "close": 10.708}, {"date": "2026-02-25", "open": 10.711, "high": 10.943, "low": 10.467, "close": 10.61}, {"date": "2026-03-04", "open": 10.565, "high": 10.707, "low": 10.317, "close": 10.577}, {"date": "2026-03-11", "open": 10.55, "high": 10.61, "low": 10.449, "close": 10.55}, {"date": "2026-03-18", "open": 10.605, "high": 10.638, "low": 9.9705, "close": 10.255}, {"date": "2026-03-25", "open": 10.287, "high": 10.385, "low": 10.036, "close": 10.265}, {"date": "2026-04-01", "open": 10.296, "high": 10.481, "low": 10.195, "close": 10.388}, {"date": "2026-04-08", "open": 10.536, "high": 10.775, "low": 10.331, "close": 10.77}, {"date": "2026-04-15", "open": 10.773, "high": 11.02, "low": 10.755, "close": 10.932}, {"date": "2026-04-22", "open": 10.939, "high": 11.035, "low": 10.883, "close": 10.983}, {"date": "2026-04-29", "open": 11.008, "high": 11.282, "low": 10.932, "close": 11.215}, {"date": "2026-05-06", "open": 11.206, "high": 11.383, "low": 11.227, "close": 11.327}, {"date": "2026-05-13", "open": 11.342, "high": 11.545, "low": 11.296, "close": 11.333}, {"date": "2026-05-20", "open": 11.325, "high": 11.679, "low": 11.317, "close": 11.662}, {"date": "2026-05-27", "open": 11.645, "high": 11.809, "low": 11.599, "close": 11.815}, {"date": "2026-06-03", "open": 11.81, "high": 11.832, "low": 11.299, "close": 11.512}, {"date": "2026-06-10", "open": 11.461, "high": 11.903, "low": 11.335, "close": 11.717}, {"date": "2026-06-17", "open": 11.74, "high": 11.959, "low": 11.663, "close": 11.733}, {"date": "2026-06-24", "open": 11.758, "high": 11.883, "low": 11.576, "close": 11.879}, {"date": "2026-07-01", "open": 11.847, "high": 11.936, "low": 11.708, "close": 11.859}, {"date": "2026-07-08", "open": 11.849, "high": 11.955, "low": 11.677, "close": 11.894}, {"date": "2026-07-15", "open": 11.896, "high": 11.933, "low": 11.653, "close": 11.885}, {"date": "2026-07-22", "open": 11.845, "high": 11.87, "low": 11.666, "close": 11.739}, {"date": "2026-07-29", "open": 11.696, "high": 12.074, "low": 11.476, "close": 12.03}, {"date": "2026-08-05", "open": 12.088, "high": 12.122, "low": 12.007, "close": 12.061}, {"date": "2026-08-12", "open": 12.076, "high": 12.205, "low": 11.958, "close": 11.961}, {"date": "2026-08-19", "open": 11.936, "high": 11.997, "low": 11.823, "close": 11.932}, {"date": "2026-08-26", "open": 11.935, "high": 12.086, "low": 11.876, "close": 11.909}, {"date": "2026-09-02", "open": 11.906, "high": 12.066, "low": 11.856, "close": 11.985}, {"date": "2026-09-09", "open": 11.99, "high": 11.998, "low": 11.819, "close": 11.859}, {"date": "2026-09-16", "open": 11.867, "high": 12.246, "low": 11.812, "close": 12.23}, {"date": "2026-09-23", "open": 12.263, "high": 12.262, "low": 12.093, "close": 12.171}, {"date": "2026-09-30", "open": 12.2, "high": 12.457, "low": 12.111, "close": 12.433}, {"date": "2026-10-07", "open": 12.437, "high": 12.481, "low": 12.272, "close": 12.408}, {"date": "2026-10-14", "open": 12.419, "high": 12.434, "low": 12.101, "close": 12.262}, {"date": "2026-10-21", "open": 12.261, "high": 12.335, "low": 12.063, "close": 12.332}, {"date": "2026-10-28", "open": 12.333, "high": 12.396, "low": 11.969, "close": 12.06}, {"date": "2026-11-04", "open": 11.898, "high": 12.253, "low": 11.668, "close": 12.058}, {"date": "2026-11-11", "open": 12.126, "high": 12.334, "low": 11.805, "close": 11.901}]}, "KYG017191142": {"name": "Alibaba Group Holding", "isin": "KYG017191142", "candles": [{"date": "2025-11-19", "open": 17.276, "high": 18.173, "low": 16.1, "close": 16.976}, {"date": "2025-11-26", "open": 17.294, "high": 17.67, "low": 16.603, "close": 17.272}, {"date": "2025-12-03", "open": 16.961, "high": 17.175, "low": 16.594, "close": 16.737}, {"date": "2025-12-10", "open": 16.849, "high": 17.369, "low": 15.618, "close": 15.872}, {"date": "2025-12-17", "open": 16.023, "high": 16.129, "low": 15.579, "close": 16.017}, {"date": "2025-12-24", "open": 15.771, "high": 15.813, "low": 15.552, "close": 15.745}, {"date": "2025-12-31", "open": 16.248, "high": 16.835, "low": 16.145, "close": 16.16}, {"date": "2026-01-07", "open": 15.933, "high": 18.344, "low": 15.542, "close": 17.907}, {"date": "2026-01-14", "open": 18.56, "high": 18.653, "low": 17.143, "close": 17.272}, {"date": "2026-01-21", "open": 17.663, "high": 19.164, "low": 17.66, "close": 17.954}, {"date": "2026-01-28", "open": 18.46, "high": 18.965, "low": 16.92, "close": 17.267}, {"date": "2026-02-04", "open": 17.34, "high": 17.659, "low": 16.454, "close": 17.399}, {"date": "2026-02-11", "open": 17.139, "high": 17.315, "low": 15.657, "close": 16.373}, {"date": "2026-02-18", "open": 16.519, "high": 16.771, "low": 15.859, "close": 16.213}, {"date": "2026-02-25", "open": 16.1, "high": 16.273, "low": 14.388, "close": 14.583}, {"date": "2026-03-04", "open": 14.184, "high": 14.949, "low": 13.807, "close": 14.819}, {"date": "2026-03-11", "open": 14.691, "high": 15.119, "low": 14.465, "close": 14.827}, {"date": "2026-03-18", "open": 15.332, "high": 15.386, "low": 13.039, "close": 13.499}, {"date": "2026-03-25", "open": 14.062, "high": 14.258, "low": 13.107, "close": 13.527}, {"date": "2026-04-01", "open": 13.594, "high": 13.657, "low": 12.785, "close": 12.915}, {"date": "2026-04-08", "open": 13.85, "high": 14.039, "low": 13.295, "close": 13.991}, {"date": "2026-04-15", "open": 13.969, "high": 15.156, "low": 13.95, "close": 14.508}, {"date": "2026-04-22", "open": 14.27, "high": 14.658, "low": 13.785, "close": 13.986}, {"date": "2026-04-29", "open": 14.165, "high": 14.496, "low": 13.795, "close": 14.071}, {"date": "2026-05-06", "open": 14.729, "high": 15.432, "low": 14.261, "close": 14.41}, {"date": "2026-05-13", "open": 14.405, "high": 15.655, "low": 13.918, "close": 14.602}, {"date": "2026-05-20", "open": 14.545, "high": 14.67, "low": 13.579, "close": 13.931}, {"date": "2026-05-27", "open": 13.626, "high": 14.399, "low": 13.26, "close": 14.246}, {"date": "2026-06-03", "open": 13.995, "high": 14.084, "low": 12.836, "close": 12.93}, {"date": "2026-06-10", "open": 12.331, "high": 12.79, "low": 11.746, "close": 11.942}, {"date": "2026-06-17", "open": 11.755, "high": 11.975, "low": 11.037, "close": 11.341}, {"date": "2026-06-24", "open": 11.265, "high": 11.391, "low": 9.932, "close": 10.593}, {"date": "2026-07-01", "open": 10.705, "high": 11.16, "low": 10.459, "close": 10.747}, {"date": "2026-07-08", "open": 11.897, "high": 12.659, "low": 11.421, "close": 12.422}, {"date": "2026-07-15", "open": 12.701, "high": 13.469, "low": 12.378, "close": 12.96}, {"date": "2026-07-22", "open": 12.73, "high": 12.885, "low": 12.138, "close": 12.699}, {"date": "2026-07-29", "open": 12.595, "high": 14.019, "low": 12.332, "close": 13.974}, {"date": "2026-08-05", "open": 14.161, "high": 14.257, "low": 13.648, "close": 13.854}, {"date": "2026-08-12", "open": 13.42, "high": 14.123, "low": 13.085, "close": 13.831}, {"date": "2026-08-19", "open": 13.723, "high": 14.058, "low": 12.183, "close": 12.78}, {"date": "2026-08-26", "open": 12.686, "high": 13.027, "low": 12.006, "close": 12.174}, {"date": "2026-09-02", "open": 12.03, "high": 12.311, "low": 11.724, "close": 12.126}, {"date": "2026-09-09", "open": 12.065, "high": 12.069, "low": 11.506, "close": 11.85}, {"date": "2026-09-16", "open": 11.746, "high": 13.174, "low": 11.61, "close": 12.723}, {"date": "2026-09-23", "open": 12.386, "high": 12.46, "low": 11.732, "close": 11.881}, {"date": "2026-09-30", "open": 11.97, "high": 12.39, "low": 11.732, "close": 12.12}, {"date": "2026-10-07", "open": 11.985, "high": 12.41, "low": 11.709, "close": 12.377}, {"date": "2026-10-14", "open": 12.513, "high": 12.86, "low": 11.838, "close": 12.05}, {"date": "2026-10-21", "open": 11.911, "high": 11.983, "low": 10.955, "close": 11.265}, {"date": "2026-10-28", "open": 11.351, "high": 11.58, "low": 10.898, "close": 11.24}, {"date": "2026-11-04", "open": 11.132, "high": 12.4, "low": 11.121, "close": 11.525}, {"date": "2026-11-11", "open": 11.511, "high": 11.631, "low": 9.834, "close": 9.8885}]}, "US5949181045": {"name": "Microsoft (MSFT)", "isin": "US5949181045", "candles": [{"date": "2025-11-19", "open": 425.05, "high": 429.525, "low": 401.825, "close": 412.275}, {"date": "2025-11-26", "open": 413.625, "high": 425.25, "low": 412.775, "close": 421.925}, {"date": "2025-12-03", "open": 421.525, "high": 423.75, "low": 407.45, "close": 422.95}, {"date": "2025-12-10", "open": 423.55, "high": 423.85, "low": 400.075, "close": 404.475}, {"date": "2025-12-17", "open": 406.0, "high": 417.25, "low": 404.625, "close": 412.725}, {"date": "2025-12-24", "open": 413.625, "high": 414.45, "low": 411.25, "close": 413.175}, {"date": "2025-12-31", "open": 414.0, "high": 415.175, "low": 401.2, "close": 409.575}, {"date": "2026-01-07", "open": 407.375, "high": 418.9, "low": 400.075, "close": 403.6}, {"date": "2026-01-14", "open": 402.425, "high": 403.225, "low": 382.825, "close": 388.025}, {"date": "2026-01-21", "open": 388.55, "high": 403.025, "low": 374.75, "close": 399.5}, {"date": "2026-01-28", "open": 402.65, "high": 404.475, "low": 345.85, "close": 348.1}, {"date": "2026-02-04", "open": 349.2, "high": 355.8, "low": 331.8, "close": 347.7}, {"date": "2026-02-11", "open": 348.225, "high": 352.1, "low": 333.425, "close": 334.4}, {"date": "2026-02-18", "open": 336.025, "high": 343.575, "low": 324.4, "close": 329.7}, {"date": "2026-02-25", "open": 329.975, "high": 350.225, "low": 328.25, "close": 347.225}, {"date": "2026-03-04", "open": 344.825, "high": 357.05, "low": 344.65, "close": 349.75}, {"date": "2026-03-11", "open": 349.3, "high": 352.925, "low": 343.375, "close": 346.15}, {"date": "2026-03-18", "open": 347.925, "high": 348.375, "low": 321.175, "close": 322.6}, {"date": "2026-03-25", "open": 322.6, "high": 326.75, "low": 309.4, "close": 321.1}, {"date": "2026-04-01", "open": 322.725, "high": 324.825, "low": 315.25, "close": 321.425}, {"date": "2026-04-08", "open": 328.65, "high": 334.625, "low": 314.1, "close": 333.4}, {"date": "2026-04-15", "open": 334.65, "high": 365.625, "low": 334.125, "close": 362.175}, {"date": "2026-04-22", "open": 363.6, "high": 370.6, "low": 345.425, "close": 365.2}, {"date": "2026-04-29", "open": 366.875, "high": 380.95, "low": 339.525, "close": 351.1}, {"date": "2026-05-06", "open": 347.85, "high": 363.525, "low": 344.4, "close": 347.4}, {"date": "2026-05-13", "open": 347.6, "high": 372.725, "low": 342.625, "close": 358.9}, {"date": "2026-05-20", "open": 360.225, "high": 373.325, "low": 354.825, "close": 356.775}, {"date": "2026-05-27", "open": 355.0, "high": 405.4, "low": 352.075, "close": 379.475}, {"date": "2026-06-03", "open": 375.9, "high": 381.35, "low": 345.675, "close": 350.025}, {"date": "2026-06-10", "open": 348.525, "high": 350.325, "low": 330.325, "close": 338.525}, {"date": "2026-06-17", "open": 339.425, "high": 340.225, "low": 320.275, "close": 328.75}, {"date": "2026-06-24", "open": 330.75, "high": 335.5, "low": 307.125, "close": 326.725}, {"date": "2026-07-01", "open": 329.075, "high": 346.025, "low": 328.875, "close": 340.9}, {"date": "2026-07-08", "open": 340.225, "high": 345.625, "low": 326.7, "close": 337.475}, {"date": "2026-07-15", "open": 337.7, "high": 354.8, "low": 335.8, "close": 348.425}, {"date": "2026-07-22", "open": 349.85, "high": 351.875, "low": 331.95, "close": 345.725}, {"date": "2026-07-29", "open": 346.9, "high": 433.525, "low": 340.2, "close": 427.6}, {"date": "2026-08-05", "open": 425.425, "high": 444.65, "low": 417.2, "close": 435.025}, {"date": "2026-08-12", "open": 434.5, "high": 434.75, "low": 412.175, "close": 415.975}, {"date": "2026-08-19", "open": 415.175, "high": 421.725, "low": 409.9, "close": 420.3}, {"date": "2026-08-26", "open": 420.025, "high": 446.775, "low": 417.65, "close": 432.425}, {"date": "2026-09-02", "open": 431.25, "high": 443.075, "low": 421.675, "close": 424.75}, {"date": "2026-09-09", "open": 425.1, "high": 441.225, "low": 419.175, "close": 431.25}, {"date": "2026-09-16", "open": 431.375, "high": 443.75, "low": 425.075, "close": 434.725}, {"date": "2026-09-23", "open": 437.95, "high": 455.825, "low": 432.075, "close": 449.0}, {"date": "2026-09-30", "open": 449.95, "high": 476.175, "low": 446.425, "close": 470.175}, {"date": "2026-10-07", "open": 470.775, "high": 492.475, "low": 462.875, "close": 484.825}, {"date": "2026-10-14", "open": 485.1, "high": 490.0, "low": 466.8, "close": 473.825}, {"date": "2026-10-21", "open": 470.4, "high": 479.975, "low": 459.05, "close": 479.075}, {"date": "2026-10-28", "open": 476.35, "high": 508.95, "low": 450.075, "close": 462.8}, {"date": "2026-11-04", "open": 457.925, "high": 498.925, "low": 457.925, "close": 478.95}, {"date": "2026-11-11", "open": 480.375, "high": 484.8, "low": 450.75, "close": 458.85}]}};
+
+    let currentIsin = "LU0496786574"; // S&P 500 default
+    let activeTab = "price"; // "price", "equity", "drawdown"
+
+    // Elements
+    const assetPills = document.getElementById("asset-pills");
+    const baseAmtInput = document.getElementById("base-amt");
+    const trimMultInput = document.getElementById("trim-mult");
+    const smaPeriodInput = document.getElementById("sma-period");
+    const scaleMultInput = document.getElementById("scale-mult");
+    const rsiThreshInput = document.getElementById("rsi-thresh");
+    const bbStdInput = document.getElementById("bb-std");
+    const dipBuyAmtInput = document.getElementById("dip-buy-amt");
+    const resetBtn = document.getElementById("reset-btn");
+
+    const tabPrice = document.getElementById("tab-price");
+    const tabEquity = document.getElementById("tab-equity");
+    const tabDrawdown = document.getElementById("tab-drawdown");
+
+    const canvas = document.getElementById("chart-canvas");
+    const ctx = canvas.getContext("2d");
+    const tooltip = document.getElementById("tooltip");
+
+    // Initialize asset pills
+    function initAssetPills() {
+      assetPills.innerHTML = "";
+      Object.keys(RAW_MARKET_DATA).forEach(isin => {
+        const item = RAW_MARKET_DATA[isin];
+        const btn = document.createElement("button");
+        const isActive = isin === currentIsin;
+        btn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+          isActive
+            ? "bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-900/50"
+            : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
+        }`;
+        btn.textContent = item.name.split(" ")[0] + " (" + isin.substring(0, 4) + ".." + isin.slice(-3) + ")";
+        btn.onclick = () => {
+          currentIsin = isin;
+          initAssetPills();
+          recalculateAndRender();
+        };
+        assetPills.appendChild(btn);
+      });
+    }
+
+    // Tab buttons
+    function setTab(tab) {
+      activeTab = tab;
+      [tabPrice, tabEquity, tabDrawdown].forEach(t => {
+        t.className = "px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:text-white transition";
+      });
+      if (tab === "price") tabPrice.className = "px-3 py-1.5 rounded-lg bg-sky-600 text-white transition";
+      if (tab === "equity") tabEquity.className = "px-3 py-1.5 rounded-lg bg-sky-600 text-white transition";
+      if (tab === "drawdown") tabDrawdown.className = "px-3 py-1.5 rounded-lg bg-sky-600 text-white transition";
+      recalculateAndRender();
+    }
+    tabPrice.onclick = () => setTab("price");
+    tabEquity.onclick = () => setTab("equity");
+    tabDrawdown.onclick = () => setTab("drawdown");
+
+    // Sliders event listeners
+    [baseAmtInput, trimMultInput, smaPeriodInput, scaleMultInput, rsiThreshInput, bbStdInput, dipBuyAmtInput].forEach(inp => {
+      inp.addEventListener("input", () => {
+        updateReadouts();
+        recalculateAndRender();
+      });
+    });
+
+    resetBtn.onclick = () => {
+      baseAmtInput.value = 400;
+      trimMultInput.value = 70;
+      smaPeriodInput.value = 40;
+      scaleMultInput.value = 140;
+      rsiThreshInput.value = 35;
+      bbStdInput.value = 2.0;
+      dipBuyAmtInput.value = 150;
+      updateReadouts();
+      recalculateAndRender();
+    };
+
+    function updateReadouts() {
+      document.getElementById("base-amt-val").textContent = `€${baseAmtInput.value}`;
+      document.getElementById("trim-mult-val").textContent = `${trimMultInput.value}% (${(trimMultInput.value / 100).toFixed(2)}x)`;
+      document.getElementById("sma-period-val").textContent = `${smaPeriodInput.value} Weeks (~${smaPeriodInput.value * 5}d)`;
+      document.getElementById("scale-mult-val").textContent = `${scaleMultInput.value}% (${(scaleMultInput.value / 100).toFixed(2)}x)`;
+      document.getElementById("rsi-val").textContent = `< ${rsiThreshInput.value}`;
+      document.getElementById("bb-std-val").textContent = `${parseFloat(bbStdInput.value).toFixed(1)} σ`;
+      document.getElementById("dip-buy-val").textContent = `€${dipBuyAmtInput.value}`;
+    }
+
+    // Indicator math
+    function calculateSMA(series, period) {
+      return series.map((val, idx) => {
+        if (idx < period - 1) return null;
+        const window = series.slice(idx - period + 1, idx + 1);
+        return window.reduce((a, b) => a + b, 0) / period;
+      });
+    }
+
+    function calculateBollinger(series, period, stdMult) {
+      const uppers = [];
+      const lowers = [];
+      const mids = [];
+      for (let i = 0; i < series.length; i++) {
+        if (i < period - 1) {
+          uppers.push(null); lowers.push(null); mids.push(null);
+          continue;
+        }
+        const w = series.slice(i - period + 1, i + 1);
+        const m = w.reduce((a, b) => a + b, 0) / period;
+        const variance = w.reduce((acc, v) => acc + Math.pow(v - m, 2), 0) / period;
+        const std = Math.sqrt(variance);
+        uppers.push(m + stdMult * std);
+        lowers.push(m - stdMult * std);
+        mids.push(m);
+      }
+      return { uppers, mids, lowers };
+    }
+
+    function calculateRSI(series, period = 14) {
+      const rsis = new Array(series.length).fill(null);
+      if (series.length <= period) return rsis;
+
+      let gains = 0, losses = 0;
+      for (let i = 1; i <= period; i++) {
+        const diff = series[i] - series[i - 1];
+        if (diff >= 0) gains += diff; else losses -= diff;
+      }
+      let avgGain = gains / period;
+      let avgLoss = losses / period;
+      rsis[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+
+      for (let i = period + 1; i < series.length; i++) {
+        const diff = series[i] - series[i - 1];
+        const gain = diff > 0 ? diff : 0;
+        const loss = diff < 0 ? -diff : 0;
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+        rsis[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+      }
+      return rsis;
+    }
+
+    let currentSimResults = null;
+
+    // Simulation Engine
+    function runSimulation() {
+      const asset = RAW_MARKET_DATA[currentIsin];
+      const candles = asset.candles;
+      const closes = candles.map(c => c.close);
+
+      const baseAmount = parseFloat(baseAmtInput.value);
+      const trimMult = parseFloat(trimMultInput.value) / 100;
+      const scaleMult = parseFloat(scaleMultInput.value) / 100;
+      const smaPeriod = parseInt(smaPeriodInput.value);
+      const rsiThresh = parseFloat(rsiThreshInput.value);
+      const bbStd = parseFloat(bbStdInput.value);
+      const dipBuyAmount = parseFloat(dipBuyAmtInput.value);
+
+      const smas = calculateSMA(closes, Math.min(smaPeriod, closes.length));
+      const { uppers, mids, lowers } = calculateBollinger(closes, 20, bbStd);
+      const rsis = calculateRSI(closes, 14);
+
+      let stdTotalInvested = 0;
+      let stdTotalShares = 0;
+      let smartTotalInvested = 0;
+      let smartTotalShares = 0;
+
+      const stdEquity = [];
+      const smartEquity = [];
+      const stdInvestedCurve = [];
+      const smartInvestedCurve = [];
+      const stdDrawdown = [];
+      const smartDrawdown = [];
+      const signals = []; // "DIP", "OVERVALUED", "NEUTRAL"
+      const periodicInvestSmart = [];
+
+      let stdPeak = 0;
+      let smartPeak = 0;
+
+      let dipCount = 0;
+      let trimCount = 0;
+
+      for (let i = 0; i < closes.length; i++) {
+        const price = closes[i];
+        const sma = smas[i];
+        const lowerBB = lowers[i];
+        const rsi = rsis[i];
+
+        // Standard DCA
+        stdTotalInvested += baseAmount;
+        stdTotalShares += baseAmount / price;
+        const stdVal = stdTotalShares * price;
+        stdEquity.push(stdVal);
+        stdInvestedCurve.push(stdTotalInvested);
+        if (stdVal > stdPeak) stdPeak = stdVal;
+        const stdDd = stdPeak > 0 ? ((stdVal - stdPeak) / stdPeak) * 100 : 0;
+        stdDrawdown.push(stdDd);
+
+        // Smart DCA Strategy Rule
+        let signal = "NEUTRAL";
+        let invest = baseAmount;
+
+        const isDip = (lowerBB !== null && price < lowerBB) || (rsi !== null && rsi < rsiThresh);
+        const isOvervalued = sma !== null && price > sma;
+
+        if (isDip) {
+          signal = "DIP";
+          invest = (baseAmount * scaleMult) + dipBuyAmount;
+          dipCount++;
+        } else if (isOvervalued) {
+          signal = "OVERVALUED";
+          invest = baseAmount * trimMult;
+          trimCount++;
+        }
+
+        signals.push(signal);
+        periodicInvestSmart.push(invest);
+
+        smartTotalInvested += invest;
+        smartTotalShares += invest / price;
+        const smartVal = smartTotalShares * price;
+        smartEquity.push(smartVal);
+        smartInvestedCurve.push(smartTotalInvested);
+        if (smartVal > smartPeak) smartPeak = smartVal;
+        const smartDd = smartPeak > 0 ? ((smartVal - smartPeak) / smartPeak) * 100 : 0;
+        smartDrawdown.push(smartDd);
+      }
+
+      const stdFinalVal = stdEquity[stdEquity.length - 1];
+      const smartFinalVal = smartEquity[smartEquity.length - 1];
+
+      const stdReturnPct = stdTotalInvested > 0 ? ((stdFinalVal - stdTotalInvested) / stdTotalInvested) * 100 : 0;
+      const smartReturnPct = smartTotalInvested > 0 ? ((smartFinalVal - smartTotalInvested) / smartTotalInvested) * 100 : 0;
+
+      const stdAvgCost = stdTotalShares > 0 ? stdTotalInvested / stdTotalShares : 0;
+      const smartAvgCost = smartTotalShares > 0 ? smartTotalInvested / smartTotalShares : 0;
+
+      const stdMDD = Math.min(...stdDrawdown);
+      const smartMDD = Math.min(...smartDrawdown);
+
+      const alpha = smartReturnPct - stdReturnPct;
+      const cashSaved = stdTotalInvested - smartTotalInvested;
+
+      return {
+        asset, candles, closes, smas, uppers, mids, lowers, rsis,
+        signals, periodicInvestSmart,
+        stdTotalInvested, stdTotalShares, stdFinalVal, stdReturnPct, stdAvgCost, stdMDD, stdEquity, stdInvestedCurve, stdDrawdown,
+        smartTotalInvested, smartTotalShares, smartFinalVal, smartReturnPct, smartAvgCost, smartMDD, smartEquity, smartInvestedCurve, smartDrawdown,
+        alpha, cashSaved, dipCount, trimCount
+      };
+    }
+
+    function recalculateAndRender() {
+      currentSimResults = runSimulation();
+      updateKPIs(currentSimResults);
+      renderChart(currentSimResults);
+      renderLedger(currentSimResults);
+    }
+
+    function updateKPIs(res) {
+      document.getElementById("kpi-smart-val").textContent = `€${res.smartFinalVal.toFixed(2)}`;
+      document.getElementById("kpi-smart-ret").textContent = `${res.smartReturnPct >= 0 ? "+" : ""}${res.smartReturnPct.toFixed(2)}%`;
+      document.getElementById("kpi-smart-ret").className = `text-xs font-semibold font-mono ${res.smartReturnPct >= 0 ? "text-green-400" : "text-red-400"}`;
+
+      document.getElementById("kpi-std-val").textContent = `€${res.stdFinalVal.toFixed(2)}`;
+      document.getElementById("kpi-std-ret").textContent = `${res.stdReturnPct >= 0 ? "+" : ""}${res.stdReturnPct.toFixed(2)}%`;
+
+      document.getElementById("kpi-mdd-smart").textContent = `${res.smartMDD.toFixed(2)}%`;
+      document.getElementById("kpi-mdd-std").textContent = `Std: ${res.stdMDD.toFixed(2)}%`;
+
+      const alphaEl = document.getElementById("kpi-alpha");
+      alphaEl.textContent = `${res.alpha >= 0 ? "+" : ""}${res.alpha.toFixed(2)}%`;
+      alphaEl.className = `text-lg md:text-xl font-bold font-mono mt-1 ${res.alpha >= 0 ? "text-green-400" : "text-amber-400"}`;
+
+      const cashSavedEl = document.getElementById("kpi-cash-saved");
+      if (res.cashSaved >= 0) {
+        cashSavedEl.textContent = `Cash saved: €${res.cashSaved.toFixed(0)}`;
+        cashSavedEl.className = "text-xs text-emerald-400 font-mono";
+      } else {
+        cashSavedEl.textContent = `Net extra deployed: €${(-res.cashSaved).toFixed(0)}`;
+        cashSavedEl.className = "text-xs text-sky-400 font-mono";
+      }
+
+      document.getElementById("kpi-invested-comp").textContent = `€${res.smartTotalInvested.toFixed(0)} vs €${res.stdTotalInvested.toFixed(0)}`;
+      document.getElementById("kpi-avg-cost").textContent = `€${res.smartAvgCost.toFixed(2)} vs €${res.stdAvgCost.toFixed(2)}`;
+      document.getElementById("kpi-shares").textContent = `${res.smartTotalShares.toFixed(2)} vs ${res.stdTotalShares.toFixed(2)}`;
+      document.getElementById("kpi-signals-count").textContent = `🟢 ${res.dipCount} Dip Buys | 🟡 ${res.trimCount} Trims`;
+
+      // Callout explanation
+      const callout = document.getElementById("strategy-callout");
+      let msg = "";
+      if (res.smartAvgCost < res.stdAvgCost) {
+        const savingPct = ((res.stdAvgCost - res.smartAvgCost) / res.stdAvgCost * 100).toFixed(2);
+        msg = `<strong>Alpha Achieved!</strong> Smart DCA reduced your average cost per share by <strong>${savingPct}%</strong> (€${res.smartAvgCost.toFixed(2)} vs €${res.stdAvgCost.toFixed(2)}) by taking advantage of ${res.dipCount} oversold dips.`;
+      } else if (res.cashSaved > 0) {
+        msg = `<strong>Capital Efficiency:</strong> In an extended bull run, Smart DCA deployed <strong>€${res.cashSaved.toFixed(0)} less capital</strong> into overvalued prices while preserving cash reserves, maintaining a comparable rate of return.`;
+      } else {
+        msg = `<strong>Balanced Accumulation:</strong> Smart DCA systematically scaled position sizing according to Bollinger & 200-SMA valuation bands.`;
+      }
+      callout.innerHTML = `<div>${msg}</div>`;
+    }
+
+    function renderLedger(res) {
+      const tbody = document.getElementById("ledger-body");
+      tbody.innerHTML = "";
+      document.getElementById("ledger-count").textContent = `${res.candles.length} Weekly Periods (${res.candles[0].date} ~ ${res.candles[res.candles.length - 1].date})`;
+
+      for (let i = res.candles.length - 1; i >= 0; i--) {
+        const c = res.candles[i];
+        const sig = res.signals[i];
+        const sma = res.smas[i];
+        const rsi = res.rsis[i];
+        const smartInv = res.periodicInvestSmart[i];
+        const stdInv = parseFloat(baseAmtInput.value);
+        const dd = res.smartDrawdown[i];
+
+        let badge = '<span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">NEUTRAL</span>';
+        if (sig === "DIP") badge = '<span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-700 font-bold">🟢 DIP BUY</span>';
+        if (sig === "OVERVALUED") badge = '<span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-950 text-amber-400 border border-amber-700">🟡 TRIM 70%</span>';
+
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-700/50 transition";
+        tr.innerHTML = `
+          <td class="p-2.5 text-slate-400">${c.date}</td>
+          <td class="p-2.5 font-bold text-slate-200">€${c.close.toFixed(2)}</td>
+          <td class="p-2.5 text-indigo-400">${sma ? "€" + sma.toFixed(2) : "-"}</td>
+          <td class="p-2.5 ${rsi && rsi < 35 ? "text-emerald-400 font-bold" : "text-slate-400"}">${rsi ? rsi.toFixed(1) : "-"}</td>
+          <td class="p-2.5">${badge}</td>
+          <td class="p-2.5 font-bold text-sky-400">€${smartInv.toFixed(0)}</td>
+          <td class="p-2.5 text-slate-500">€${stdInv.toFixed(0)}</td>
+          <td class="p-2.5 text-slate-300">${res.smartTotalShares.toFixed(2)}</td>
+          <td class="p-2.5 text-amber-400">${dd.toFixed(1)}%</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // Canvas Chart Rendering
+    function renderChart(res) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const padTop = 30;
+      const padBottom = 40;
+      const padLeft = 60;
+      const padRight = 30;
+
+      const plotW = w - padLeft - padRight;
+      const plotH = h - padTop - padBottom;
+
+      const n = res.closes.length;
+      if (n < 2) return;
+
+      const getX = (idx) => padLeft + (idx / (n - 1)) * plotW;
+
+      // Draw Grid
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= 4; i++) {
+        const y = padTop + (i / 4) * plotH;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(w - padRight, y);
+        ctx.stroke();
+      }
+
+      if (activeTab === "price") {
+        // Price, SMA, Bollinger Bands
+        const validValues = [
+          ...res.closes,
+          ...res.smas.filter(v => v !== null),
+          ...res.uppers.filter(v => v !== null),
+          ...res.lowers.filter(v => v !== null)
+        ];
+        const minVal = Math.min(...validValues) * 0.96;
+        const maxVal = Math.max(...validValues) * 1.04;
+        const getY = (val) => padTop + plotH - ((val - minVal) / (maxVal - minVal)) * plotH;
+
+        // Y-axis labels
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "10px monospace";
+        ctx.textAlign = "right";
+        for (let i = 0; i <= 4; i++) {
+          const val = minVal + (i / 4) * (maxVal - minVal);
+          const y = padTop + plotH - (i / 4) * plotH;
+          ctx.fillText(`€${val.toFixed(1)}`, padLeft - 8, y + 3);
+        }
+
+        // Bollinger Band Cloud (translucent)
+        ctx.beginPath();
+        let firstLower = true;
+        for (let i = 0; i < n; i++) {
+          if (res.uppers[i] !== null) {
+            const x = getX(i);
+            const y = getY(res.uppers[i]);
+            if (firstLower) { ctx.moveTo(x, y); firstLower = false; } else ctx.lineTo(x, y);
+          }
+        }
+        for (let i = n - 1; i >= 0; i--) {
+          if (res.lowers[i] !== null) {
+            ctx.lineTo(getX(i), getY(res.lowers[i]));
+          }
+        }
+        ctx.closePath();
+        ctx.fillStyle = "rgba(56, 189, 248, 0.08)";
+        ctx.fill();
+
+        // Bollinger Bands lines
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.4)";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        res.uppers.forEach((v, i) => { if (v !== null) ctx.lineTo(getX(i), getY(v)); });
+        ctx.stroke();
+        ctx.beginPath();
+        res.lowers.forEach((v, i) => { if (v !== null) ctx.lineTo(getX(i), getY(v)); });
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 200-SMA line (Indigo)
+        ctx.strokeStyle = "#818cf8";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let startedSma = false;
+        res.smas.forEach((v, i) => {
+          if (v !== null) {
+            const x = getX(i); const y = getY(v);
+            if (!startedSma) { ctx.moveTo(x, y); startedSma = true; } else ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+
+        // Price Line
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        res.closes.forEach((p, i) => {
+          const x = getX(i); const y = getY(p);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Signal Markers
+        res.signals.forEach((sig, i) => {
+          const x = getX(i);
+          const y = getY(res.closes[i]);
+          if (sig === "DIP") {
+            ctx.fillStyle = "#22c55e";
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          } else if (sig === "OVERVALUED") {
+            ctx.fillStyle = "#f59e0b";
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+
+      } else if (activeTab === "equity") {
+        // Equity Curves (Smart vs Standard vs Invested)
+        const allVals = [...res.smartEquity, ...res.stdEquity, ...res.stdInvestedCurve];
+        const minVal = 0;
+        const maxVal = Math.max(...allVals) * 1.08;
+        const getY = (val) => padTop + plotH - (val / maxVal) * plotH;
+
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "10px monospace";
+        ctx.textAlign = "right";
+        for (let i = 0; i <= 4; i++) {
+          const val = (i / 4) * maxVal;
+          const y = padTop + plotH - (i / 4) * plotH;
+          ctx.fillText(`€${val.toFixed(0)}`, padLeft - 8, y + 3);
+        }
+
+        // Total Invested Benchmark Line (Dotted Gray)
+        ctx.strokeStyle = "#64748b";
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        res.stdInvestedCurve.forEach((val, i) => {
+          const x = getX(i); const y = getY(val);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Standard DCA Equity (Slate / Purple)
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        res.stdEquity.forEach((val, i) => {
+          const x = getX(i); const y = getY(val);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Smart DCA Equity (Bright Sky/Green)
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        res.smartEquity.forEach((val, i) => {
+          const x = getX(i); const y = getY(val);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+      } else if (activeTab === "drawdown") {
+        // Drawdown Underwater Chart (0% to negative MDD)
+        const minDd = Math.min(...res.smartDrawdown, ...res.stdDrawdown, -1);
+        const maxDd = 0;
+        const getY = (val) => padTop + (val / minDd) * plotH;
+
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "10px monospace";
+        ctx.textAlign = "right";
+        for (let i = 0; i <= 4; i++) {
+          const val = (i / 4) * minDd;
+          const y = padTop + (i / 4) * plotH;
+          ctx.fillText(`${val.toFixed(1)}%`, padLeft - 8, y + 3);
+        }
+
+        // Fill Smart Drawdown Area (Cyan Translucent)
+        ctx.beginPath();
+        ctx.moveTo(getX(0), padTop);
+        res.smartDrawdown.forEach((dd, i) => ctx.lineTo(getX(i), getY(dd)));
+        ctx.lineTo(getX(n - 1), padTop);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(56, 189, 248, 0.2)";
+        ctx.fill();
+
+        // Standard DCA Line (Red/Amber)
+        ctx.strokeStyle = "#f87171";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        res.stdDrawdown.forEach((dd, i) => {
+          const x = getX(i); const y = getY(dd);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Smart DCA Line (Cyan)
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        res.smartDrawdown.forEach((dd, i) => {
+          const x = getX(i); const y = getY(dd);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+
+      // X-axis Dates
+      ctx.fillStyle = "#64748b";
+      ctx.font = "9px monospace";
+      ctx.textAlign = "center";
+      const step = Math.ceil(n / 6);
+      for (let i = 0; i < n; i += step) {
+        const x = getX(i);
+        ctx.fillText(res.candles[i].date.substring(5), x, h - padBottom + 18);
+      }
+      ctx.fillText(res.candles[n - 1].date.substring(5), getX(n - 1), h - padBottom + 18);
+    }
+
+    // Canvas Mouse Hover Tooltip
+    canvas.addEventListener("mousemove", (e) => {
+      if (!currentSimResults) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const padLeft = 60;
+      const padRight = 30;
+      const plotW = rect.width - padLeft - padRight;
+      const n = currentSimResults.closes.length;
+
+      const idx = Math.round(((mouseX - padLeft) / plotW) * (n - 1));
+      if (idx < 0 || idx >= n) {
+        tooltip.classList.add("hidden");
+        return;
+      }
+
+      const res = currentSimResults;
+      const c = res.candles[idx];
+      const sig = res.signals[idx];
+
+      let content = `
+        <div class="text-sky-300 font-bold border-b border-slate-700 pb-1 mb-1">${c.date}</div>
+        <div class="text-slate-200">Price: <span class="font-bold">€${c.close.toFixed(2)}</span></div>
+      `;
+
+      if (activeTab === "price") {
+        const sma = res.smas[idx];
+        const rsi = res.rsis[idx];
+        content += `
+          <div>SMA: <span class="text-indigo-400">${sma ? "€" + sma.toFixed(2) : "-"}</span></div>
+          <div>RSI-14: <span class="${rsi && rsi < 35 ? "text-emerald-400 font-bold" : "text-slate-300"}">${rsi ? rsi.toFixed(1) : "-"}</span></div>
+          <div>Signal: <span class="font-bold ${sig === "DIP" ? "text-emerald-400" : sig === "OVERVALUED" ? "text-amber-400" : "text-slate-400"}">${sig}</span></div>
+        `;
+      } else if (activeTab === "equity") {
+        content += `
+          <div>Smart Value: <span class="text-sky-400 font-bold">€${res.smartEquity[idx].toFixed(2)}</span></div>
+          <div>Std Value: <span class="text-slate-300">€${res.stdEquity[idx].toFixed(2)}</span></div>
+          <div>Invested: <span class="text-slate-400">€${res.smartInvestedCurve[idx].toFixed(0)}</span></div>
+        `;
+      } else if (activeTab === "drawdown") {
+        content += `
+          <div>Smart DD: <span class="text-sky-400 font-bold">${res.smartDrawdown[idx].toFixed(2)}%</span></div>
+          <div>Std DD: <span class="text-red-400 font-bold">${res.stdDrawdown[idx].toFixed(2)}%</span></div>
+        `;
+      }
+
+      tooltip.innerHTML = content;
+      tooltip.classList.remove("hidden");
+
+      // Position tooltip safely
+      const ttX = Math.min(mouseX + 15, rect.width - 160);
+      const ttY = Math.max(mouseY - 80, 10);
+      tooltip.style.left = `${ttX}px`;
+      tooltip.style.top = `${ttY}px`;
+    });
+
+    canvas.addEventListener("mouseleave", () => tooltip.classList.add("hidden"));
+    window.addEventListener("resize", () => renderChart(currentSimResults));
+
+    // Boot
+    initAssetPills();
+    updateReadouts();
+    recalculateAndRender();
+  </script>
+</body>
+</html>
