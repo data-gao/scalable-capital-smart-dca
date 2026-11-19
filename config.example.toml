@@ -1,62 +1,64 @@
 # ==============================================================================
-# Scalable Capital - 智能价值平均定投器 (Smart / Value-Averaging DCA) 配置
+# Scalable Capital - Smart / Value-Averaging DCA Configuration
 # ==============================================================================
 
 [app]
-# 运行模式:
-#   "dry-run": 纯模拟计算，输出技术指标、信号与拟执行指令，不调用 Scalable 下单/改计划接口 (默认安全模式)
-#   "preview": 执行 Phase 1 预检（调用 sc broker savings-plans add / trade buy 获取事前费用清单和确认 ID）
-#   "live":    执行 Phase 2 真实确认提交（需谨慎开启）
+# Execution mode:
+#   "dry-run": Simulation only; calculates indicators, evaluates signals, and
+#              displays planned commands without sending requests to broker (Default safe mode).
+#   "preview": Runs Phase 1 preview (calls `sc broker savings-plans add` / `trade buy`
+#              to fetch ex-ante cost disclosures and confirmation token).
+#   "live":    Executes Phase 2 confirmation with actual submission (use with caution).
 mode = "dry-run"
 state_file = ".smart_dca_state.json"
 
 [safety]
-# 全局安全风控限制
-max_monthly_budget = 2500.0            # 所有标的月度定投总额硬上限 (€)
-max_single_trade_amount = 500.0        # 单次抄底加仓买入金额上限 (€)
-opportunistic_buy_cooldown_days = 7    # 单一标的抄底买入冷却天数（避免连续多天下跌重复全仓抄底）
+# Global safety and risk limits
+max_monthly_budget = 2000.0            # Hard upper limit across all monthly savings plans (EUR)
+max_single_trade_amount = 500.0        # Upper limit for an opportunistic dip buy trade (EUR)
+opportunistic_buy_cooldown_days = 7    # Cooldown period (days) before a dip buy can trigger again on the same asset
 
 # ------------------------------------------------------------------------------
-# 监控与定投标的 (Targets)
+# Target Assets & Strategy Rules
 # ------------------------------------------------------------------------------
 
-# 1. S&P 500: Amundi Core S&P 500 Swap EUR (Dist)
+# 1. Global Equity: Vanguard FTSE All-World (VWCE)
 [[targets]]
-isin = "LU0496786574"
-name = "Amundi Core S&P 500"
-base_amount = 400.0                    # 基准月定投额 (€400)
-execution_day_of_month = 10            # 定投扣款日 (每月10日)
+isin = "IE00BK5BQT80"
+name = "Vanguard FTSE All-World (VWCE)"
+base_amount = 400.0                    # Base monthly investment amount (EUR)
+execution_day_of_month = 4             # Savings plan execution day (4th of each month)
 
 [targets.overvalued_rule]
 enabled = true
 condition = "price_above_sma"
-sma_period = 200                       # 200日均线 (或40周均线)
-amount_multiplier = 0.70               # 高于 200 均线（估值偏高）时，定投额下调为 70% (€280)
+sma_period = 200                       # 200-day SMA (or 40-week equivalent)
+amount_multiplier = 0.70               # When price > 200 SMA, trim monthly plan to 70% (EUR 280)
 
 [targets.oversold_rule]
 enabled = true
 condition = "bollinger_lower_or_rsi_oversold"
 rsi_period = 14
-rsi_threshold = 30.0                   # RSI < 30
+rsi_threshold = 30.0                   # RSI-14 < 30
 bollinger_period = 20
-bollinger_std = 2.0                    # 布林带下轨 (20, 2σ)
-action_type = "scale_up_savings_plan"  # "scale_up_savings_plan" 或 "opportunistic_trade_buy" 或 "both"
-savings_plan_multiplier = 1.30         # 击穿下轨或超卖时，调大定投额至 130% (€520)
-trade_buy_amount = 100.0               # 若启用一次性抄底买入，单次加仓额 (€)
+bollinger_std = 2.0                    # Price below lower Bollinger Band (20, 2 std)
+action_type = "scale_up_savings_plan"  # "scale_up_savings_plan", "opportunistic_trade_buy", or "both"
+savings_plan_multiplier = 1.30         # When dip/oversold is detected, increase savings plan to 130% (EUR 520)
+trade_buy_amount = 150.0               # Amount for one-off opportunistic buy trade if enabled (EUR)
 
 
-# 2. 全球股票: Vanguard FTSE All-World (VWCE)
+# 2. US Market: iShares Core S&P 500
 [[targets]]
-isin = "IE00BK5BQT80"
-name = "Vanguard FTSE All-World (VWCE)"
-base_amount = 500.0                    # 基准月定投额 (€500)
-execution_day_of_month = 4
+isin = "IE00B5BMR087"
+name = "iShares Core S&P 500"
+base_amount = 300.0                    # Base monthly investment (EUR)
+execution_day_of_month = 10
 
 [targets.overvalued_rule]
 enabled = true
 condition = "price_above_sma"
 sma_period = 200
-amount_multiplier = 0.70               # 高于 200 均线时下调至 70% (€350)
+amount_multiplier = 0.70               # High valuation: Trim to 70% (EUR 210)
 
 [targets.oversold_rule]
 enabled = true
@@ -65,17 +67,17 @@ rsi_period = 14
 rsi_threshold = 30.0
 bollinger_period = 20
 bollinger_std = 2.0
-action_type = "both"                   # 既调大下期定投，又触发一次性抄底买入
-savings_plan_multiplier = 1.40         # 调大至 140% (€700)
-trade_buy_amount = 200.0               # 一次性抄底买入 €200
+action_type = "both"                   # Both scale up next plan AND trigger one-off dip buy
+savings_plan_multiplier = 1.40         # Scale up to 140% (EUR 420)
+trade_buy_amount = 200.0               # One-off buy order of EUR 200
 
 
-# 3. 全球股票 (Scalable Prime 免佣): Scalable MSCI AC World Xtrackers
+# 3. Developed World: iShares Core MSCI World
 [[targets]]
-isin = "LU2903252349"
-name = "Scalable MSCI AC World Xtrackers"
-base_amount = 100.0
-execution_day_of_month = 7
+isin = "IE00B4L5Y983"
+name = "iShares Core MSCI World"
+base_amount = 200.0
+execution_day_of_month = 15
 
 [targets.overvalued_rule]
 enabled = true
@@ -88,55 +90,4 @@ enabled = true
 condition = "bollinger_lower_or_rsi_oversold"
 rsi_threshold = 30.0
 action_type = "scale_up_savings_plan"
-savings_plan_multiplier = 1.50         # 调大至 150% (€150)
-
-
-# 4. 科技/消费个股: Alibaba Group Holding
-[[targets]]
-isin = "KYG017191142"
-name = "Alibaba Group Holding"
-base_amount = 250.0                    # 基准月定投额 (€250，匹配当前计划)
-execution_day_of_month = 4             # 定投扣款日 (每月4日)
-
-[targets.overvalued_rule]
-enabled = true
-condition = "price_above_sma"
-sma_period = 200
-amount_multiplier = 0.70               # 高于 200 均线时下调至 70% (€175)
-
-[targets.oversold_rule]
-enabled = true
-condition = "bollinger_lower_or_rsi_oversold"
-rsi_period = 14
-rsi_threshold = 30.0
-bollinger_period = 20
-bollinger_std = 2.0
-action_type = "scale_up_savings_plan"  # 击穿下轨/超卖时调大定投
-savings_plan_multiplier = 1.30         # 调大至 130% (€325)
-trade_buy_amount = 100.0
-
-
-# 5. 美股科技蓝筹: Microsoft (MSFT)
-[[targets]]
-isin = "US5949181045"
-name = "Microsoft (MSFT)"
-base_amount = 200.0                    # 基准月定投额 (€200)
-execution_day_of_month = 4             # 定投扣款日 (每月4日)
-
-[targets.overvalued_rule]
-enabled = true
-condition = "price_above_sma"
-sma_period = 200
-amount_multiplier = 0.70               # 高于 200 均线时下调至 70% (€140)
-
-[targets.oversold_rule]
-enabled = true
-condition = "bollinger_lower_or_rsi_oversold"
-rsi_period = 14
-rsi_threshold = 30.0
-bollinger_period = 20
-bollinger_std = 2.0
-action_type = "scale_up_savings_plan"  # 击穿下轨/超卖时调大定投
-savings_plan_multiplier = 1.30         # 调大至 130% (€260)
-trade_buy_amount = 200.0
-
+savings_plan_multiplier = 1.50         # Scale up to 150% (EUR 300)
